@@ -1,14 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
+from groq import Groq
 
 app = Flask(__name__)
 
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 
-client = OpenAI(api_key=api_key)
+client = Groq(api_key=api_key)
 
 @app.route("/")
 def hello_world():
@@ -17,38 +17,48 @@ def hello_world():
 @app.route("/ask", methods=["POST"])
 def ask():
     question = request.form.get("question")
+    if not question:
+        return jsonify({"response": "Please ask a valid question."}), 400
         
-    response = client.responses.create(
-        model="gpt-5.4",
-        input=[
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
                 {"role": "system", "content": "Act like a helpful personal assistant"},
                 {"role": "user", "content": question}
             ],
             temperature=0.7,
-            max_output_tokens=512
-    )
-        
-    answer = response.output_text.strip()
-    return jsonify({"response": answer}), 200
+            max_tokens=512
+        )
+        answer = response.choices[0].message.content.strip()
+        return jsonify({"response": answer}), 200
+    except Exception as e:
+        return jsonify({"response": f"Error communicating with Groq: {str(e)}"}), 500
 
 @app.route("/summarize", methods=["POST"])
 def summarize():
     email_text = request.form.get("email")
+    if not email_text:
+        return jsonify({"response": "Please provide an email to summarize."}), 400
+        
     prompt = f"summarize the following email in 2-3 sentences: {email_text}"
         
-    response = client.responses.create(
-        model="gpt-5.4",
-        input=[
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
                 {"role": "system", "content": "Act like an expert email assistant"},                
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,
-            max_output_tokens=512
-    )
-        
-    summary = response.output_text.strip()
-    return jsonify({"response": summary}), 200
+            max_tokens=512
+        )
+        summary = response.choices[0].message.content.strip()
+        return jsonify({"response": summary}), 200
+    except Exception as e:
+        return jsonify({"response": f"Error communicating with Groq: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
